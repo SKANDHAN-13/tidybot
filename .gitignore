@@ -5,6 +5,10 @@ log/
 *.pyc
 __pycache__/
 
+# Do NOT ignore environment files — reviewers need them
+!.env
+!setup_env.sh
+
 # RViz session locks
 *.rviz.lock
 
