@@ -1,0 +1,14 @@
+# Python dependencies for TidyBot
+# Install with:  pip install -r requirements.txt
+#
+# All packages below are available via pip on Ubuntu 22.04 / Python 3.10.
+# ROS 2 packages are listed separately in the README and installed via apt.
+
+numpy>=1.23.0
+opencv-python>=4.7.0      # used by object_detector for PC2 cluster analysis
+scipy>=1.10.0             # optional: spatial transforms / KDTree for cluster merging
+open3d>=0.17.0            # optional: richer point-cloud visualisation / debugging
+matplotlib>=3.6.0         # used by tools/compute_inertia.py for geometry plots
+
+# Map-generation script (tools/generate_map.py) uses only stdlib — no extras needed.
+# Inertia tool (tools/compute_inertia.py) uses only numpy + matplotlib above.
