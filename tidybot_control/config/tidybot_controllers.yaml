@@ -1,0 +1,43 @@
+# tidybot_controllers.yaml
+# ========================
+# ros2_control / controller_manager configuration for TidyBot.
+#
+# NOTE: TidyBot uses Gazebo Classic with libgazebo_ros_joint_pose_trajectory
+# for arm joint control (see tidybot_description/urdf/tidybot.urdf.xacro).
+# This file documents the equivalent ros2_control configuration for reference
+# and for future migration to Gazebo Ignition / ros2_control hardware interface.
+
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    # Publishes joint states for all joints
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # Arm joint trajectory controller
+    arm_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+arm_trajectory_controller:
+  ros__parameters:
+    joints:
+      - right_shoulder_joint
+      - right_elbow_joint
+      - right_wrist_joint
+      - right_gripper_left_finger_joint
+      - right_gripper_right_finger_joint
+    interface_name: position
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    open_loop_control: true
+    allow_integration_in_goal_trajectories: true
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 5.0

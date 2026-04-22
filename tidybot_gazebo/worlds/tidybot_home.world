@@ -1,0 +1,661 @@
+<?xml version="1.0" ?>
+<!--
+  TidyBot Home World
+  ==================
+  Layout (interior, meters):
+    Room 1 (Living Room): x=[0,5]  y=[0,4]    5x4 m
+    Room 2 (Kitchen)    : x=[5.15,9.15] y=[0,4]  4x4 m
+    Shared wall         : x=[5.0,5.15], doorway gap y=[1.5,2.5] (1.0 m wide)
+    Wall thickness      : 0.15 m     Wall height: 2.5 m
+
+  Physics justification:
+    step_size  = 0.001 s (1 ms) : standard for manipulation/contact simulation;
+                                     keeps constraint solver stable under gripper
+                                     contact without tunnelling.
+    gravity    = -9.81 m/s^2    : standard Earth gravity.
+    Ground mu  = 0.8            : laminate/tile indoor floor (ASHRAE ref ~0.6-0.9
+                                     for rubber on tile; 0.8 conservative midpoint).
+
+  Robot spawn  : (1.0, 2.0, 0.22) - centre of Room 1.
+  Collection box near spawn at approx (0.35, 2.0).
+-->
+<sdf version="1.6">
+<world name="tidybot_home">
+
+  <!-- ================================================================
+       PHYSICS
+       ================================================================ -->
+  <physics type="ode" name="default_physics">
+    <max_step_size>0.001</max_step_size>
+    <real_time_factor>1.0</real_time_factor>
+    <real_time_update_rate>1000</real_time_update_rate>
+    <gravity>0 0 -9.81</gravity>
+    <ode>
+      <solver>
+        <type>quick</type>
+        <iters>50</iters>
+        <sor>1.3</sor>
+      </solver>
+      <constraints>
+        <cfm>0.0</cfm>
+        <erp>0.2</erp>
+        <contact_max_correcting_vel>100.0</contact_max_correcting_vel>
+        <contact_surface_layer>0.001</contact_surface_layer>
+      </constraints>
+    </ode>
+  </physics>
+
+  <!-- ================================================================
+       SCENE / LIGHTING
+       ================================================================ -->
+  <scene>
+    <ambient>0.4 0.4 0.4 1</ambient>
+    <background>0.7 0.7 0.7 1</background>
+    <shadows>true</shadows>
+  </scene>
+
+  <!-- Sun (directional, angled to cast soft indoor shadows) -->
+  <light type="directional" name="sun">
+    <cast_shadows>true</cast_shadows>
+    <pose>0 0 10 0 0.4 0</pose>
+    <diffuse>0.85 0.85 0.85 1</diffuse>
+    <specular>0.2  0.2  0.2  1</specular>
+    <direction>-0.5 0.1 -0.9</direction>
+    <attenuation><range>1000</range><constant>0.9</constant><linear>0.01</linear><quadratic>0.001</quadratic></attenuation>
+  </light>
+
+  <!-- Ceiling fill light over Room 1 -->
+  <light type="point" name="room1_fill">
+    <pose>2.5 2.0 2.4 0 0 0</pose>
+    <diffuse>0.6 0.6 0.6 1</diffuse>
+    <specular>0.1 0.1 0.1 1</specular>
+    <attenuation><range>8</range><constant>0.5</constant><linear>0.1</linear><quadratic>0.01</quadratic></attenuation>
+  </light>
+
+  <!-- Ceiling fill light over Room 2 -->
+  <light type="point" name="room2_fill">
+    <pose>7.15 2.0 2.4 0 0 0</pose>
+    <diffuse>0.6 0.6 0.6 1</diffuse>
+    <specular>0.1 0.1 0.1 1</specular>
+    <attenuation><range>8</range><constant>0.5</constant><linear>0.1</linear><quadratic>0.01</quadratic></attenuation>
+  </light>
+
+  <!-- ================================================================
+       GROUND PLANE
+       mu=0.8: Representative of laminate/tile indoor flooring.
+       Reference: ASTM C1028 slip-resistance test, typical mu ~0.6-0.9 dry.
+       0.8 prevents robot wheel slip while allowing gripper-pushed objects
+       to slide realistically without shooting away.
+       ================================================================ -->
+  <model name="ground_plane">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision">
+        <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
+        <surface>
+          <friction>
+            <ode><mu>0.8</mu><mu2>0.8</mu2></ode>
+          </friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="visual">
+        <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
+        <material>
+          <script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Grey</name></script>
+        </material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ================================================================
+       WALLS
+       All walls: static, thickness=0.15m, height=2.5m
+       Color: white/off-white (0.92 0.92 0.90)
+       ================================================================ -->
+
+  <!-- WEST WALL (Room 1 left boundary) -->
+  <!-- Centre: x=-0.075, y=2.0, z=1.25 | size: 0.15 x 4.30 x 2.5 -->
+  <model name="wall_west">
+    <static>true</static>
+    <pose>-0.075 2.0 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.15 4.30 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.15 4.30 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- SOUTH WALL (full span, both rooms) -->
+  <!-- Center: x=4.575, y=-0.075, z=1.25 | size: 9.45 x 0.15 x 2.5 -->
+  <model name="wall_south">
+    <static>true</static>
+    <pose>4.575 -0.075 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>9.45 0.15 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>9.45 0.15 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- NORTH WALL (full span, both rooms) -->
+  <!-- Center: x=4.575, y=4.075, z=1.25 | size: 9.45 x 0.15 x 2.5 -->
+  <model name="wall_north">
+    <static>true</static>
+    <pose>4.575 4.075 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>9.45 0.15 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>9.45 0.15 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- EAST WALL (Room 2 right boundary) -->
+  <!-- Center: x=9.225, y=2.0, z=1.25 | size: 0.15 x 4.30 x 2.5 -->
+  <model name="wall_east">
+    <static>true</static>
+    <pose>9.225 2.0 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.15 4.30 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.15 4.30 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- SHARED WALL SEGMENT 1 (below doorway: y=[0,1.5]) -->
+  <!-- Center: x=5.075, y=0.75, z=1.25 | size: 0.15 x 1.50 x 2.5 -->
+  <model name="wall_shared_south">
+    <static>true</static>
+    <pose>5.075 0.75 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.15 1.50 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.15 1.50 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- SHARED WALL SEGMENT 2 (above doorway: y=[2.5,4.0]) -->
+  <!-- Center: x=5.075, y=3.25, z=1.25 | size: 0.15 x 1.50 x 2.5 -->
+  <model name="wall_shared_north">
+    <static>true</static>
+    <pose>5.075 3.25 1.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.15 1.50 2.5</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.15 1.50 2.5</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- DOORWAY HEADER (lintel above the 1m doorway gap, closes wall visually) -->
+  <!-- y=[1.5,2.5], z=[2.1,2.5], x=5.075 | size: 0.15 x 1.0 x 0.4 -->
+  <model name="wall_shared_lintel">
+    <static>true</static>
+    <pose>5.075 2.0 2.3 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.15 1.0 0.4</size></box></geometry>
+        <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.15 1.0 0.4</size></box></geometry>
+        <material><ambient>0.92 0.92 0.90 1</ambient><diffuse>0.92 0.92 0.90 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ================================================================
+       FURNITURE — ROOM 1 (Living Room)
+       All furniture: static=true, mass defined for physics realism.
+       Non-static chair masses ~8 kg, table ~20 kg, sofa ~40 kg,
+       shelf ~25 kg — objects will not tip or move when robot bumps them.
+       ================================================================ -->
+
+  <!-- SOFA (against south wall, room 1) -->
+  <!-- 1.8 x 0.7 x 0.5 m | Center: (1.0, 0.45, 0.25) -->
+  <model name="sofa">
+    <static>true</static>
+    <pose>1.0 0.45 0.25 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>1.8 0.7 0.5</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>1.8 0.7 0.5</size></box></geometry>
+        <material><ambient>0.40 0.25 0.15 1</ambient><diffuse>0.40 0.25 0.15 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- COFFEE TABLE (in front of sofa) -->
+  <!-- 0.8 x 0.5 x 0.4 m | Center: (1.0, 1.35, 0.2) -->
+  <model name="coffee_table">
+    <static>true</static>
+    <pose>1.0 1.35 0.2 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.8 0.5 0.4</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.8 0.5 0.4</size></box></geometry>
+        <material><ambient>0.55 0.35 0.15 1</ambient><diffuse>0.55 0.35 0.15 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- DINING TABLE (Room 1) -->
+  <!-- 1.2 x 0.8 x 0.75 m | Center: (3.8, 2.0, 0.375) -->
+  <model name="dining_table">
+    <static>true</static>
+    <pose>3.8 2.0 0.375 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>1.2 0.8 0.75</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>1.2 0.8 0.75</size></box></geometry>
+        <material><ambient>0.60 0.40 0.20 1</ambient><diffuse>0.60 0.40 0.20 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- CHAIR 1 (south side of dining table) -->
+  <!-- 0.45 x 0.45 x 0.9 m | Center: (3.5, 1.3, 0.45) -->
+  <model name="chair_1">
+    <static>true</static>
+    <pose>3.5 1.3 0.45 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <material><ambient>0.65 0.45 0.25 1</ambient><diffuse>0.65 0.45 0.25 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- CHAIR 2 (north side of dining table) -->
+  <!-- Center: (4.1, 2.8, 0.45) -->
+  <model name="chair_2">
+    <static>true</static>
+    <pose>4.1 2.8 0.45 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <material><ambient>0.65 0.45 0.25 1</ambient><diffuse>0.65 0.45 0.25 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- BOOKSHELF (against north wall, Room 1) — narrow passage near wall -->
+  <!-- 0.8 x 0.30 x 1.5 m | Center: (0.5, 3.87, 0.75) -->
+  <model name="bookshelf">
+    <static>true</static>
+    <pose>0.5 3.87 0.75 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.8 0.30 1.5</size></box></geometry>
+        <surface><friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.8 0.30 1.5</size></box></geometry>
+        <material><ambient>0.30 0.20 0.10 1</ambient><diffuse>0.30 0.20 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ================================================================
+       FURNITURE — ROOM 2 (Kitchen)
+       ================================================================ -->
+
+  <!-- KITCHEN COUNTER (against south wall, Room 2) -->
+  <!-- 2.0 x 0.6 x 0.9 m | Center: (7.15, 0.35, 0.45) -->
+  <model name="kitchen_counter">
+    <static>true</static>
+    <pose>7.15 0.35 0.45 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>2.0 0.6 0.9</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>2.0 0.6 0.9</size></box></geometry>
+        <material><ambient>0.85 0.85 0.80 1</ambient><diffuse>0.85 0.85 0.80 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- KITCHEN TABLE (Room 2) -->
+  <!-- 1.0 x 0.8 x 0.75 m | Center: (7.15, 2.5, 0.375) -->
+  <model name="kitchen_table">
+    <static>true</static>
+    <pose>7.15 2.5 0.375 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>1.0 0.8 0.75</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>1.0 0.8 0.75</size></box></geometry>
+        <material><ambient>0.75 0.75 0.70 1</ambient><diffuse>0.75 0.75 0.70 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- CHAIR 3 (west side of kitchen table) -->
+  <!-- Center: (6.5, 2.5, 0.45) -->
+  <model name="chair_3">
+    <static>true</static>
+    <pose>6.5 2.5 0.45 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <material><ambient>0.65 0.45 0.25 1</ambient><diffuse>0.65 0.45 0.25 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- CHAIR 4 (north-east side of kitchen table) — partially blocking path -->
+  <!-- Center: (7.8, 3.2, 0.45) -->
+  <model name="chair_4">
+    <static>true</static>
+    <pose>7.8 3.2 0.45 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+        <material><ambient>0.65 0.45 0.25 1</ambient><diffuse>0.65 0.45 0.25 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- TALL CABINET (against east wall, Room 2) -->
+  <!-- 0.6 x 0.35 x 1.8 m | Center: (9.07, 2.0, 0.9) -->
+  <model name="cabinet">
+    <static>true</static>
+    <pose>9.07 2.0 0.9 0 0 0</pose>
+    <link name="link">
+      <collision name="col">
+        <geometry><box><size>0.6 0.35 1.8</size></box></geometry>
+        <surface><friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis">
+        <geometry><box><size>0.6 0.35 1.8</size></box></geometry>
+        <material><ambient>0.55 0.40 0.25 1</ambient><diffuse>0.55 0.40 0.25 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ================================================================
+       COLLECTION BOX  — near robot spawn (1.0, 2.0) in Room 1
+       Open-top box: interior 0.5 x 0.5 x 0.25 m
+       5 panels: floor + 4 side walls (thickness 0.02 m)
+       Mass of each panel ~2 kg (heavy enough not to topple from deposits)
+       ================================================================ -->
+
+  <!-- Box floor — solid base so deposited objects don't fall through -->
+  <model name="cbox_floor">
+    <static>true</static>
+    <pose>0.35 3.3 0.01 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.54 0.54 0.02</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.54 0.54 0.02</size></box></geometry>
+        <material><ambient>0.10 0.60 0.10 1</ambient><diffuse>0.10 0.60 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Box south wall -->
+  <model name="cbox_wall_s">
+    <static>true</static>
+    <pose>0.35 3.04 0.145 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.54 0.02 0.27</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.54 0.02 0.27</size></box></geometry>
+        <material><ambient>0.10 0.60 0.10 1</ambient><diffuse>0.10 0.60 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Box north wall -->
+  <model name="cbox_wall_n">
+    <static>true</static>
+    <pose>0.35 3.56 0.145 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.54 0.02 0.27</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.54 0.02 0.27</size></box></geometry>
+        <material><ambient>0.10 0.60 0.10 1</ambient><diffuse>0.10 0.60 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Box west wall -->
+  <model name="cbox_wall_w">
+    <static>true</static>
+    <pose>0.09 3.3 0.145 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.02 0.54 0.27</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.02 0.54 0.27</size></box></geometry>
+        <material><ambient>0.10 0.60 0.10 1</ambient><diffuse>0.10 0.60 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Box east wall -->
+  <model name="cbox_wall_e">
+    <static>true</static>
+    <pose>0.61 3.3 0.145 0 0 0</pose>
+    <link name="link">
+      <collision name="col"><geometry><box><size>0.02 0.54 0.27</size></box></geometry>
+        <surface><friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction></surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.02 0.54 0.27</size></box></geometry>
+        <material><ambient>0.10 0.60 0.10 1</ambient><diffuse>0.10 0.60 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- ================================================================
+       PICKUP OBJECTS  (6 required + 1 bonus in Room 2)
+       Physics spec for stable grasping / push:
+         mass    : 0.2 - 0.4 kg   (matches arm payload capacity)
+         mu      : 0.5            (smooth plastic on tile; slides but not shoots)
+         mu2     : 0.5
+         min_depth: 0.001m        (prevents tunnel-through)
+         restitution: 0.0        (no bounce, stays where placed)
+       All objects sized >= 3 x gripper-finger contact width for reliable grasp.
+       ================================================================ -->
+
+  <!-- Object 1: Red block (Room 1, open floor area) -->
+
+  <model name="obj_red_block">
+    <pose>2.5 1.5 0.025 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.30</mass>
+        <inertia><ixx>0.000125</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000125</iyy><iyz>0</iyz><izz>0.000125</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <material><ambient>0.85 0.10 0.10 1</ambient><diffuse>0.85 0.10 0.10 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 2: Blue block (Room 1, near dining table) -->
+  
+  <model name="obj_blue_block">
+    <pose>3.0 3.2 0.025 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.30</mass>
+        <inertia><ixx>0.000125</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000125</iyy><iyz>0</iyz><izz>0.000125</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <material><ambient>0.10 0.30 0.85 1</ambient><diffuse>0.10 0.30 0.85 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 3: Yellow cylinder — "can" (Room 1, against west wall) -->
+  <!-- r=0.03m, h=0.08m, mass=0.25kg -->
+  <!-- Inertia (axis z): Ixx=Iyy=m/12*(3r^2+h^2) Izz=m/2*r^2 -->
+  <!-- Ixx = 0.25/12*(0.0027+0.0064)=0.000190  Izz=0.25/2*0.0009=0.0001125 -->
+  <model name="obj_yellow_can">
+    <pose>2.0 3.3 0.04 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.25</mass>
+        <inertia><ixx>0.000190</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000190</iyy><iyz>0</iyz><izz>0.000113</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><cylinder><radius>0.03</radius><length>0.08</length></cylinder></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><cylinder><radius>0.03</radius><length>0.08</length></cylinder></geometry>
+        <material><ambient>0.95 0.90 0.05 1</ambient><diffuse>0.95 0.90 0.05 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 4: Green small box (Room 1, between sofa and bookshelf) -->
+  <!-- 0.06 x 0.04 x 0.04 m, mass=0.25 kg -->
+  <model name="obj_green_box">
+    <pose>1.5 3.0 0.02 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.25</mass>
+        <inertia><ixx>0.0000533</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.0000650</iyy><iyz>0</iyz><izz>0.0000433</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><box><size>0.06 0.04 0.04</size></box></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.06 0.04 0.04</size></box></geometry>
+        <material><ambient>0.10 0.70 0.20 1</ambient><diffuse>0.10 0.70 0.20 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 5: Orange block (Room 2, Kitchen area floor) -->
+  <model name="obj_orange_block">
+    <pose>7.0 1.5 0.025 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.30</mass>
+        <inertia><ixx>0.000125</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000125</iyy><iyz>0</iyz><izz>0.000125</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <material><ambient>0.90 0.45 0.05 1</ambient><diffuse>0.90 0.45 0.05 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 6: Teal cylinder — "bottle" (Room 2, near cabinet) -->
+  <!-- r=0.025m, h=0.10m, mass=0.20 kg -->
+  <!-- Inertia: Ixx=Iyy=0.20/12*(3*0.000625+0.01)=0.000197  Izz=0.20/2*0.000625=0.0000625 -->
+  <model name="obj_teal_bottle">
+    <pose>8.5 1.8 0.05 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.20</mass>
+        <inertia><ixx>0.000197</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000197</iyy><iyz>0</iyz><izz>0.0000625</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><cylinder><radius>0.025</radius><length>0.10</length></cylinder></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><cylinder><radius>0.025</radius><length>0.10</length></cylinder></geometry>
+        <material><ambient>0.05 0.70 0.65 1</ambient><diffuse>0.05 0.70 0.65 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+  <!-- Object 7 (bonus): Purple box — "shoe" (Room 2, near kitchen table) -->
+  <!-- 0.10 x 0.05 x 0.05 m, mass=0.40 kg -->
+  <!-- Inertia: Ixx=0.4/12*(0.0025+0.0025)=0.000167  Iyy=0.4/12*(0.01+0.0025)=0.000417  Izz=0.4/12*(0.01+0.0025)=0.000417 -->
+  <model name="obj_purple_shoe">
+
+    <pose>7.5 3.5 0.025 0 0 0</pose>
+    <link name="link">
+      <inertial><mass>0.40</mass>
+        <inertia><ixx>0.000167</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.000417</iyy><iyz>0</iyz><izz>0.000417</izz></inertia>
+      </inertial>
+      <collision name="col"><geometry><box><size>0.10 0.05 0.05</size></box></geometry>
+        <surface>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
+          <contact><ode><min_depth>0.001</min_depth></ode></contact>
+          <bounce><restitution_coefficient>0.0</restitution_coefficient><threshold>1e6</threshold></bounce>
+        </surface>
+      </collision>
+      <visual name="vis"><geometry><box><size>0.10 0.05 0.05</size></box></geometry>
+        <material><ambient>0.55 0.10 0.75 1</ambient><diffuse>0.55 0.10 0.75 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+
+</world>
+</sdf>

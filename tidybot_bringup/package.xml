@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tidybot_bringup</name>
+  <version>1.0.0</version>
+  <description>Top-level bringup launch for the complete TidyBot simulation</description>
+  <maintainer email="skandh1308@gmail.com">skandy</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>tidybot_description</exec_depend>
+  <exec_depend>tidybot_gazebo</exec_depend>
+  <exec_depend>tidybot_navigation</exec_depend>
+  <exec_depend>tidybot_control</exec_depend>
+  <exec_depend>tidybot_behavior</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
