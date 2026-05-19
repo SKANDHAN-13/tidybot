@@ -6,6 +6,7 @@ perception, and picks them up one-by-one to deposit them in a collection box —
 all inside a Gazebo Classic environment.
 
 ---
+Progress so far : https://drive.google.com/file/d/1L5781UdOSQGmv5vbr5ag53MVKTL5yOd5/view?usp=sharing
 
 ## Table of Contents
 
